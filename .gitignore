@@ -1,0 +1,34 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+env/
+venv/
+ENV/
+*.env
+
+# Database
+*.sqlite3
+
+# Django migrations (optional to ignore)
+**/migrations/*.py
+**/migrations/*.pyc
+!**/migrations/__init__.py
+
+# Logs
+*.log
+
+# Media / uploads
+media/
+staticfiles/
+
+# OS files
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
