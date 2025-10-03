@@ -1,5 +1,5 @@
 from django.db import models
-from shop.models import Branch
+from shop.models import Shop
 from products.models import ShopItem
 from user.models import Address, User
 
@@ -22,14 +22,14 @@ class Order(models.Model):
     )
 
     customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="orders")
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="orders", null=True)
     delivery_boy = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="deliveries",
-        limit_choices_to={"role": "deliveryboy"},  # only users with role=deliveryboy
+        limit_choices_to={"role": "deliveryboy"},
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default="pending")
@@ -54,18 +54,17 @@ class Order(models.Model):
             total_price += item.price * item.quantity
             total_gst += item.gst
 
-        # Delivery charge (example: use first delivery condition if exists)
         delivery_charge = 0
-        if hasattr(self.branch, "delivery_conditions") and self.branch.delivery_conditions.exists():
-            cond = self.branch.delivery_conditions.first()
-            delivery_charge = cond.minimum_amount  # Replace with your own logic
+        if self.shop and self.shop.delivery_conditions.exists():
+            cond = self.shop.delivery_conditions.first()
+            delivery_charge = cond.free_delivery_amount  # adjust logic if needed
 
         self.gst = total_gst
         self.delivery_charge = delivery_charge
         self.total_price = total_price + total_gst + delivery_charge
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)  # Save first to ensure PK exists
+        super().save(*args, **kwargs)  # ensure PK exists
         self.calculate_totals()
         super().save(update_fields=["total_price", "gst", "delivery_charge"])
 

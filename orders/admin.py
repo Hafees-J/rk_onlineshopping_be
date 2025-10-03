@@ -11,16 +11,16 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ("id", "customer", "branch", "status", "total_price", "created_at")
-    list_filter = ("status", "branch")
-    search_fields = ("customer__username", "branch__name")
+    list_display = ("id", "customer", "shop", "status", "total_price_display", "created_at")
+    list_filter = ("status", "shop")
+    search_fields = ("customer__username", "shop__name")
     inlines = [OrderItemInline]
-    readonly_fields = ("total_price",)  # optional: total_price is computed
+    readonly_fields = ("total_price_display",)  # optional: total_price is computed
     date_hierarchy = "created_at"
 
-    def total_price(self, obj):
+    def total_price_display(self, obj):
         return sum(item.price * item.quantity for item in obj.items.all())
-    total_price.short_description = "Total Price"
+    total_price_display.short_description = "Total Price"
 
 
 @admin.register(OrderItem)

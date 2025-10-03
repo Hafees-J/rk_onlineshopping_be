@@ -6,6 +6,6 @@ router = DefaultRouter()
 router.register(r'orders', OrderViewSet, basename='order')
 
 urlpatterns = [
-    path("distance/", calculate_delivery_distance, name="calculate-distance"),
+    path("calculate-delivery-distance/", calculate_delivery_distance, name="calculate-delivery-distance"),
     path('', include(router.urls)),
 ]

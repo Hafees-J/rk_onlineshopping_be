@@ -1,37 +1,31 @@
 from rest_framework import viewsets, generics, permissions
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
-from .models import DeliveryCondition, Shop, Branch
-from .serializers import ShopSerializer, BranchSerializer, DeliveryConditionSerializer, MyBranchSerializer
+from .models import DeliveryCondition, Shop
+from .serializers import ShopSerializer, DeliveryConditionSerializer, MyShopSerializer
 
+
+# ---------------- Shop ViewSet ---------------- #
 class ShopViewSet(viewsets.ModelViewSet):
-    queryset = Shop.objects.all()
     serializer_class = ShopSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-
-class BranchViewSet(viewsets.ModelViewSet):
-    queryset = Branch.objects.all()
-    serializer_class = BranchSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        # shopadmins see only their branches, others see all
+        # Shop admins see only their shops, others see all
         if user.role == "shopadmin":
-            return Branch.objects.filter(owner=user)
-        return Branch.objects.all()
+            return Shop.objects.filter(owner=user)
+        return Shop.objects.all()
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
-
 
 
 # ---------------- DeliveryCondition ViewSet ---------------- #
 class DeliveryConditionViewSet(viewsets.ModelViewSet):
     """
     - Customers: read-only access to all delivery conditions.
-    - Shop Admins: can view/edit only their branch's condition.
+    - Shop Admins: can view/edit only their Shop's condition.
     - Superadmins: full access.
     """
     serializer_class = DeliveryConditionSerializer
@@ -45,7 +39,7 @@ class DeliveryConditionViewSet(viewsets.ModelViewSet):
         if user.role == "superadmin":
             return DeliveryCondition.objects.all()
         elif user.role == "shopadmin":
-            return DeliveryCondition.objects.filter(branch__owner=user)
+            return DeliveryCondition.objects.filter(shop__owner=user)
         elif user.role == "customer":
             return DeliveryCondition.objects.all()
         return DeliveryCondition.objects.none()
@@ -56,29 +50,30 @@ class DeliveryConditionViewSet(viewsets.ModelViewSet):
         if user.role == "superadmin":
             serializer.save()
         elif user.role == "shopadmin":
-            branch = Branch.objects.filter(owner=user).first()
-            if not branch:
-                raise PermissionDenied("No branch found for this shop admin.")
+            shop = Shop.objects.filter(owner=user).first()
+            if not shop:
+                raise PermissionDenied("No shop found for this shop admin.")
 
-            if branch.delivery_conditions.exists():
-                raise PermissionDenied("This branch already has a delivery condition.")
+            if shop.delivery_conditions.exists():
+                raise PermissionDenied("This shop already has a delivery condition.")
 
-            serializer.save(branch=branch)
+            serializer.save(shop=shop)
         else:
             raise PermissionDenied("You do not have permission to create delivery conditions.")
 
 
-class MyBranchView(generics.RetrieveAPIView):
-    serializer_class = MyBranchSerializer
+# ---------------- MyShop View ---------------- #
+class MyShopView(generics.RetrieveAPIView):
+    serializer_class = MyShopSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         if request.user.role != "shopadmin":
-            return Response({"detail": "Only shop admins have branches."}, status=403)
+            return Response({"detail": "Only shop admins have shops."}, status=403)
 
-        branch = request.user.branches.filter(is_active=True).first()
-        if not branch:
-            return Response({"detail": "No active branch found."}, status=404)
+        shop = request.user.shops.filter(is_active=True).first()
+        if not shop:
+            return Response({"detail": "No active shop found."}, status=404)
 
-        serializer = self.get_serializer(branch)
+        serializer = self.get_serializer(shop)
         return Response(serializer.data)

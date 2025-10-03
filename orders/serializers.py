@@ -18,23 +18,23 @@ class OrderSerializer(serializers.ModelSerializer):
     customer = serializers.HiddenField(default=serializers.CurrentUserDefault())
     customer_name = serializers.CharField(source="customer.username", read_only=True)
     customer_email = serializers.CharField(source="customer.email", read_only=True)
-    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
 
     class Meta:
         model = Order
         fields = [
             "id",
-            "customer",          # hidden, auto set
+            "customer",
             "customer_name",
             "customer_email",
-            "branch",
-            "branch_name",
+            "shop",
+            "shop_name",
             "status",
             "payment_status",
             "created_at",
             "updated_at",
-            "items",          # for creation
-            "items_details",  # for display
+            "items",
+            "items_details",
             "total_price",
             "gst",
             "delivery_charge",
@@ -67,5 +67,5 @@ class DistanceInputSerializer(serializers.Serializer):
     user_lng = serializers.FloatField()
     shop_lat = serializers.FloatField()
     shop_lng = serializers.FloatField()
-    branch_id = serializers.IntegerField()              # ID of the branch for delivery condition
-    total_order_amount = serializers.DecimalField(max_digits=10, decimal_places=2)  # Total cart/order amount
+    shop_id = serializers.IntegerField()  # ID of the Shop for delivery condition
+    total_order_amount = serializers.DecimalField(max_digits=10, decimal_places=2)

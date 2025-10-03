@@ -1,13 +1,12 @@
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
 from rest_framework.exceptions import PermissionDenied
-from .models import Order
-from .serializers import OrderSerializer, DistanceInputSerializer
-from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
-from shop.models import Branch
 from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from .models import Order
+from .serializers import OrderSerializer, DistanceInputSerializer
+from shop.models import Shop
 from .utils import get_distance_duration
 
 
@@ -19,7 +18,7 @@ class IsCustomer(permissions.BasePermission):
         )
 
 
-class IsBranchAdmin(permissions.BasePermission):
+class IsShopAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         return (
             request.user.is_authenticated
@@ -38,7 +37,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Order.objects.filter(customer=user)
 
         if getattr(user, "role", None) == "shopadmin":
-            return Order.objects.filter(branch__owner=user)
+            return Order.objects.filter(shop__owner=user)
 
         return Order.objects.none()
 
@@ -49,13 +48,13 @@ class OrderViewSet(viewsets.ModelViewSet):
 def calculate_delivery_distance(request):
     """
     Calculate distance, duration, and delivery charge.
-    Input: user_lat, user_lng, shop_lat, shop_lng, branch_id, total_order_amount
+    Input: user_lat, user_lng, shop_lat, shop_lng, shop_id, total_order_amount
     """
     serializer = DistanceInputSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
 
-    required_fields = ['user_lat', 'user_lng', 'shop_lat', 'shop_lng', 'branch_id', 'total_order_amount']
+    required_fields = ['user_lat', 'user_lng', 'shop_lat', 'shop_lng', 'shop_id', 'total_order_amount']
     if not all(field in data for field in required_fields):
         return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -72,11 +71,11 @@ def calculate_delivery_distance(request):
     # Convert distance to km
     distance_km = result['distance_value'] / 1000
 
-    # Get branch and delivery condition
-    branch = get_object_or_404(Branch, id=data['branch_id'])
-    condition = branch.delivery_conditions.first()
+    # Get Shop and delivery condition
+    shop = get_object_or_404(Shop, id=data['shop_id'])
+    condition = shop.delivery_conditions.first()
     if not condition:
-        return Response({"error": "Delivery condition not set for this branch"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Delivery condition not set for this Shop"}, status=status.HTTP_400_BAD_REQUEST)
 
     total_amount = data['total_order_amount']
     delivery_charge = None

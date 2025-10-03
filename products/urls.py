@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
+    ShopsBySubCategoryView,
     CategoryViewSet,
     SubCategoryViewSet,
     ItemViewSet,
@@ -20,6 +21,19 @@ router.register(r'shop-item-offers', ShopItemOfferViewSet, basename="shopitemoff
 urlpatterns = [
     path("", include(router.urls)),
 
-    path("subcategories-per-category/<int:category_id>/", SubCategoryPerCategoryView.as_view(), name="subcategories-per-category"),
-    path("items-per-subcategory/<int:subcategory_id>/", ItemPerSubCategoryView.as_view(), name="items-per-subcategory"),
+    path(
+        "subcategories-per-category/<int:category_id>/",
+        SubCategoryPerCategoryView.as_view(),
+        name="subcategories-per-category"
+    ),
+    path(
+        "items-per-subcategory/<int:subcategory_id>/",
+        ItemPerSubCategoryView.as_view(),
+        name="items-per-subcategory"
+    ),
+    path(
+        "shops/by-subcategory/<int:subcategory_id>/",
+        ShopsBySubCategoryView.as_view(),
+        name="shops-by-subcategory"
+    ),
 ]

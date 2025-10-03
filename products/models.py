@@ -1,5 +1,5 @@
 from django.db import models
-from shop.models import Branch
+from shop.models import Shop
 
 
 class Category(models.Model):
@@ -47,8 +47,18 @@ class Item(models.Model):
     def __str__(self):
         return f"{self.name} - {self.subcategory.name}"
 
+
+
+class ShopCategory(models.Model):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+
+class ShopSubCategory(models.Model):
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
+    subcategory = models.ForeignKey(SubCategory, on_delete=models.CASCADE)
+
 class ShopItem(models.Model):
-    shop = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="shopitems")
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="shopitems")
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="shopitems")
     price = models.DecimalField(max_digits=10, decimal_places=2)
     available_quantity = models.PositiveIntegerField(default=0)
