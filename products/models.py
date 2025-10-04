@@ -1,6 +1,6 @@
 from django.db import models
 from shop.models import Shop
-
+from decimal import Decimal, ROUND_HALF_UP
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -26,9 +26,7 @@ class SubCategory(models.Model):
 
 class HSN(models.Model):
     hsncode = models.CharField(max_length=20, unique=True)
-    cgst = models.DecimalField(max_digits=5, decimal_places=2)
-    sgst = models.DecimalField(max_digits=5, decimal_places=2)
-    igst = models.DecimalField(max_digits=5, decimal_places=2)
+    gst = models.DecimalField(max_digits=5, decimal_places=2)
 
     def __str__(self):
         return self.hsncode
@@ -57,27 +55,69 @@ class ShopSubCategory(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
     subcategory = models.ForeignKey(SubCategory, on_delete=models.CASCADE)
 
+
+
 class ShopItem(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="shopitems")
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="shopitems")
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2) 
     available_quantity = models.PositiveIntegerField(default=0)
     available_from = models.TimeField(null=True, blank=True)
     available_till = models.TimeField(null=True, blank=True)
     is_available = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ('shop', 'item')  # same item shouldn’t repeat in same shop
+        unique_together = ('shop', 'item')
 
     def __str__(self):
         return f"{self.item.name} @ {self.shop.name}"
+
+    @property
+    def gst_percent(self):
+        """Get GST % from item's HSN."""
+        if self.item.hsn and self.item.hsn.gst:
+            return Decimal(self.item.hsn.gst)
+        return Decimal('0')
+
+    def calculate_taxable_and_gst(self):
+        """Calculate taxable price and GST amount from total price."""
+        gst_percent = self.gst_percent
+        if gst_percent > 0:
+            taxable = (self.price * 100 / (100 + gst_percent)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            gst_amount = (self.price - taxable).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            return taxable, gst_amount
+        else:
+            return self.total_amount, Decimal('0.00')
+
+ 
+    @property
+    def active_offer(self):
+        """Return active offer for UI highlights. Fast filter using active flag."""
+        return self.offers.filter(active=True).first()
+
+    def get_offer_price(self):
+        """
+        Calculate simple offer price for UI highlight.
+        Ignores quantity limits and GST.
+        """
+        offer = self.active_offer
+        if offer:
+            # Discounted price per unit
+            discounted_price = (self.total_amount * (offer.offer_pct) / 100).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP
+            )
+            return self.total_amount-discounted_price
+        else:
+            return self.total_amount
 
 
 class ShopItemOffer(models.Model):
     shop_item = models.ForeignKey(ShopItem, on_delete=models.CASCADE, related_name="offers")
     offer_starting_datetime = models.DateTimeField()
     offer_ending_datetime = models.DateTimeField()
-    offer_price = models.DecimalField(max_digits=10, decimal_places=2)
+    offer_pct = models.DecimalField(max_digits=5, decimal_places=2)  # 10 = 10%
+    max_quantity = models.PositiveIntegerField(default=1)  # 0 = unlimited
+    active = models.BooleanField(default=False)  # for fast filtering
 
     def __str__(self):
-        return f"Offer for {self.shop_item.item.name} in {self.shop_item.shop.name}"
+        return f"Offer {self.offer_pct}% for {self.shop_item.item.name} in {self.shop_item.shop.name}"

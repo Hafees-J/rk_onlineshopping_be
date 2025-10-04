@@ -32,12 +32,21 @@ class ItemSerializer(serializers.ModelSerializer):
 
 class ShopItemSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source="item.name", read_only=True)
-    shop_name = serializers.CharField(source="shop.name", read_only=True)
+    discount_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = ShopItem
-        fields = ['id', 'shop', 'shop_name', 'item', 'item_name',
-                  'price', 'available_quantity', 'available_from', 'available_till']
+        fields = [
+            'id', 'shop', 'item', 'item_name', 'total_amount', 
+             'discount_amount',
+            'available_quantity', 'available_from', 'available_till', 'is_available'
+        ]
+        read_only_fields = [ 'discount_amount', 'item_name']
+
+    def get_discount_amount(self, obj):
+        """Return the offer price for UI highlighting (single-unit)."""
+        return obj.get_offer_price()
+
 
 
 class ShopItemOfferSerializer(serializers.ModelSerializer):
@@ -46,7 +55,7 @@ class ShopItemOfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShopItemOffer
         fields = ['id', 'shop_item', 'shop_item_name',
-                  'offer_starting_datetime', 'offer_ending_datetime', 'offer_price']
+                  'offer_starting_datetime', 'offer_ending_datetime', 'offer_pct']
 
 
 class AvailableSubCategorySerializer(serializers.ModelSerializer):
@@ -61,20 +70,25 @@ class AvailableSubCategorySerializer(serializers.ModelSerializer):
 class CustomerShopItemSerializer(serializers.ModelSerializer):
     item_name = serializers.CharField(source="item.name", read_only=True)
     shop_name = serializers.CharField(source="shop.name", read_only=True)
-    offer_price = serializers.SerializerMethodField()
+    offer_pct = serializers.SerializerMethodField()
+    discount_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = ShopItem
         fields = [
             'id', 'shop', 'shop_name', 'item', 'item_name',
-            'price', 'available_quantity', 'is_available',
-            'offer_price'
+            'total_amount', 'available_quantity', 'is_available',
+            'offer_pct', 'discount_amount'
         ]
 
-    def get_offer_price(self, obj):
+    def get_offer_pct(self, obj):
         now = timezone.now()
         offer = obj.offers.filter(
             offer_starting_datetime__lte=now,
             offer_ending_datetime__gte=now
         ).first()
-        return offer.offer_price if offer else None
+        return offer.offer_pct if offer else None
+    
+    def get_discount_amount(self, obj):
+        """Return the offer price for UI highlighting (single-unit)."""
+        return obj.get_offer_price()
