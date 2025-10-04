@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Category, SubCategory, Item, ShopItem, ShopItemOffer
+from django.utils import timezone
+from .models import Category, ShopSubCategory, SubCategory, Item, ShopItem, ShopItemOffer
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -46,3 +47,34 @@ class ShopItemOfferSerializer(serializers.ModelSerializer):
         model = ShopItemOffer
         fields = ['id', 'shop_item', 'shop_item_name',
                   'offer_starting_datetime', 'offer_ending_datetime', 'offer_price']
+
+
+class AvailableSubCategorySerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source="subcategory.id")
+    name = serializers.CharField(source="subcategory.name")
+
+    class Meta:
+        model = ShopSubCategory
+        fields = ["id", "name"]
+
+
+class CustomerShopItemSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source="item.name", read_only=True)
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
+    offer_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ShopItem
+        fields = [
+            'id', 'shop', 'shop_name', 'item', 'item_name',
+            'price', 'available_quantity', 'is_available',
+            'offer_price'
+        ]
+
+    def get_offer_price(self, obj):
+        now = timezone.now()
+        offer = obj.offers.filter(
+            offer_starting_datetime__lte=now,
+            offer_ending_datetime__gte=now
+        ).first()
+        return offer.offer_price if offer else None

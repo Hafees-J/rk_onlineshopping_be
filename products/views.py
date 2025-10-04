@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, generics
+from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -6,7 +7,9 @@ from shop.models import Shop
 from shop.serializers import ShopSerializer
 from .models import Category, ShopCategory, ShopSubCategory, SubCategory, Item, ShopItem, ShopItemOffer
 from .serializers import (
+    AvailableSubCategorySerializer,
     CategorySerializer,
+    CustomerShopItemSerializer,
     SubCategorySerializer,
     ItemSerializer,
     ShopItemSerializer,
@@ -18,6 +21,9 @@ class IsShopAdmin(permissions.BasePermission):
     """Only Shop admins can access"""
     def has_permission(self, request, view):
         return request.user.is_authenticated and getattr(request.user, "role", None) == "shopadmin"
+class IsCustomer(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and getattr(request.user, "role", None) == "customer"
 
 
 # ---------------- GLOBAL MODELS -----------------
@@ -138,3 +144,24 @@ class ShopsBySubCategoryView(generics.ListAPIView):
         return Shop.objects.filter(
             shopsubcategory__subcategory_id=subcategory_id
         ).distinct()
+
+
+class AvailableSubCategoriesView(generics.ListAPIView):
+    queryset = ShopSubCategory.objects.select_related("subcategory").all().distinct()
+    serializer_class = AvailableSubCategorySerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        print("User:", self.request.user)
+        print("Authenticated:", self.request.user.is_authenticated)
+        print("Role:", getattr(self.request.user, "role", None))
+        return super().get_queryset()
+
+
+class CustomerShopItemsView(generics.ListAPIView):
+    serializer_class = CustomerShopItemSerializer
+    permission_classes = [permissions.AllowAny]  # or IsAuthenticated if needed
+
+    def get_queryset(self):
+        shop_id = self.kwargs['shop_id']
+        return ShopItem.objects.filter(shop_id=shop_id, is_available=True)
