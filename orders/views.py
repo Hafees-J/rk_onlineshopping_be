@@ -4,10 +4,76 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from .models import Order
-from .serializers import OrderSerializer, DistanceInputSerializer
+from .models import Order, Cart, OrderItem
+from .serializers import OrderSerializer, DistanceInputSerializer, CartSerializer
 from shop.models import Shop
 from .utils import get_distance_duration
+from rest_framework.decorators import action
+
+class CartViewSet(viewsets.ModelViewSet):
+    serializer_class = CartSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Return only cart items for the logged-in user
+        return Cart.objects.filter(customer=self.request.user)
+
+    def perform_create(self, serializer):
+        # Get or create a cart item (avoid duplicates)
+        cart_item, created = Cart.objects.get_or_create(
+            customer=self.request.user,
+            shop_item=serializer.validated_data["shop_item"],
+            defaults={"quantity": serializer.validated_data.get("quantity", 1)},
+        )
+
+        if not created:
+            # If already in cart, increment quantity
+            cart_item.quantity += serializer.validated_data.get("quantity", 1)
+            cart_item.save()
+
+        return cart_item
+
+    def create(self, request, *args, **kwargs):
+        """
+        Override create to ensure SerializerMethodFields work correctly.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        cart_item = self.perform_create(serializer)
+
+        # Serialize the model instance, not validated_data
+        read_serializer = self.get_serializer(cart_item)
+        headers = self.get_success_headers(read_serializer.data)
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @action(detail=False, methods=["post"])
+    def checkout(self, request):
+        customer = request.user
+        cart_items = Cart.objects.filter(customer=customer)
+
+        if not cart_items.exists():
+            return Response({"detail": "Cart is empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # All items should belong to the same shop ideally
+        shop = cart_items.first().shop_item.shop
+
+        order = Order.objects.create(customer=customer, shop=shop)
+
+        for item in cart_items:
+            OrderItem.objects.create(
+                order=order,
+                shop_item=item.shop_item,
+                quantity=item.quantity,
+                price=item.shop_item.get_offer_price(),  # Correctly calculate offer price
+            )
+
+        order.calculate_totals()
+        order.save()
+
+        # Clear cart after checkout
+        cart_items.delete()
+
+        return Response({"message": "Order placed successfully!", "order_id": order.id})
 
 
 class IsCustomer(permissions.BasePermission):

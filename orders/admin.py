@@ -1,7 +1,7 @@
 from django.contrib import admin
-from .models import Order, OrderItem
+from .models import Cart, Order, OrderItem
 
-
+admin.site.register(Cart)
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0

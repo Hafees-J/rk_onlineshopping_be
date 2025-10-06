@@ -55,7 +55,7 @@ class ShopItemOfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShopItemOffer
         fields = ['id', 'shop_item', 'shop_item_name',
-                  'offer_starting_datetime', 'offer_ending_datetime', 'offer_pct']
+                  'offer_starting_datetime', 'offer_ending_datetime', 'offer_pct', 'active']
 
 
 class AvailableSubCategorySerializer(serializers.ModelSerializer):

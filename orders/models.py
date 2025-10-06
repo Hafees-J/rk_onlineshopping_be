@@ -3,6 +3,24 @@ from shop.models import Shop
 from products.models import ShopItem
 from user.models import Address, User
 
+class Cart(models.Model):
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="cart")
+    shop_item = models.ForeignKey(ShopItem, on_delete=models.CASCADE, related_name="cart_items")
+    quantity = models.PositiveIntegerField(default=1)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('customer', 'shop_item')  # prevent duplicates
+        ordering = ['-added_at']
+
+    def subtotal(self):
+        """Calculate total for this item"""
+        price = self.shop_item.get_offer_price()
+        return price * self.quantity
+
+    def __str__(self):
+        return f"{self.customer.username} - {self.shop_item.item.name} ({self.quantity})"
+
 
 class Order(models.Model):
     STATUS_CHOICES = (

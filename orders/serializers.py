@@ -1,7 +1,19 @@
 from rest_framework import serializers
 from .models import Order, OrderItem
+from .models import Cart
 
+class CartSerializer(serializers.ModelSerializer):
+    shop_item_name = serializers.CharField(source="shop_item.item.name", read_only=True)
+    price = serializers.SerializerMethodField()
 
+    class Meta:
+        model = Cart
+        fields = ["id", "shop_item", "shop_item_name", "quantity", "price"]
+
+    def get_price(self, obj):
+        return obj.shop_item.get_offer_price()
+
+    
 class OrderItemSerializer(serializers.ModelSerializer):
     shop_item_name = serializers.CharField(source="shop_item.item.name", read_only=True)
 
