@@ -5,13 +5,38 @@ from .models import Cart
 class CartSerializer(serializers.ModelSerializer):
     shop_item_name = serializers.CharField(source="shop_item.item.name", read_only=True)
     price = serializers.SerializerMethodField()
+    
+    # New fields
+    shop_id = serializers.IntegerField(source="shop_item.shop.id", read_only=True)
+    shop_name = serializers.CharField(source="shop_item.shop.name", read_only=True)
+    shop_lat = serializers.SerializerMethodField()
+    shop_lng = serializers.SerializerMethodField()
 
     class Meta:
         model = Cart
-        fields = ["id", "shop_item", "shop_item_name", "quantity", "price"]
+        fields = [
+            "id",
+            "shop_item",
+            "shop_item_name",
+            "quantity",
+            "price",
+            "shop_id",
+            "shop_name",
+            "shop_lat",
+            "shop_lng",
+        ]
 
     def get_price(self, obj):
         return obj.shop_item.get_offer_price()
+
+    def get_shop_lat(self, obj):
+        lat = getattr(obj.shop_item.shop, "latitude", None)
+        return float(lat) if lat else None
+
+    def get_shop_lng(self, obj):
+        lng = getattr(obj.shop_item.shop, "longitude", None)
+        return float(lng) if lng else None
+
 
     
 class OrderItemSerializer(serializers.ModelSerializer):
