@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, CustomerProfile
+from .models import Address, User, CustomerProfile
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -40,3 +40,25 @@ class CustomerRegisterSerializer(serializers.ModelSerializer):
         # create empty customer profile
         CustomerProfile.objects.create(user=user)
         return user
+
+
+class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = [
+            "id",
+            "address_line",
+            "city",
+            "state",
+            "postal_code",
+            "country",
+            "is_default",
+            "latitude",
+            "longitude",
+        ]
+        read_only_fields = ["id"]
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        validated_data.pop("user", None)
+        return Address.objects.create(user=user, **validated_data)

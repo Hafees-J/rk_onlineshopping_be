@@ -15,48 +15,75 @@ class CartViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Return only cart items for the logged-in user
+        """Return only cart items for the logged-in user"""
         return Cart.objects.filter(customer=self.request.user)
 
     def perform_create(self, serializer):
-        # Get or create a cart item (avoid duplicates)
+        """Create or update cart item"""
+        customer = self.request.user
+        shop_item = serializer.validated_data["shop_item"]
+        quantity = serializer.validated_data.get("quantity", 1)
+        reset = self.request.data.get("reset", False)
+
+        # Get all current items in user's cart
+        existing_cart_items = Cart.objects.filter(customer=customer)
+
+        # If there are existing items, ensure same shop
+        if existing_cart_items.exists():
+            existing_shop = existing_cart_items.first().shop_item.shop
+            if shop_item.shop != existing_shop:
+                # Different shop detected
+                if not reset:
+                    # Ask confirmation from frontend
+                    return {
+                        "requires_reset": True,
+                        "detail": "Your cart contains items from another restaurant. Do you want to reset it to add this item?"
+                    }
+
+                # If reset=True, clear cart before adding new item
+                existing_cart_items.delete()
+
+        # Add or update item in cart
         cart_item, created = Cart.objects.get_or_create(
-            customer=self.request.user,
-            shop_item=serializer.validated_data["shop_item"],
-            defaults={"quantity": serializer.validated_data.get("quantity", 1)},
+            customer=customer,
+            shop_item=shop_item,
+            defaults={"quantity": quantity},
         )
 
         if not created:
-            # If already in cart, increment quantity
-            cart_item.quantity += serializer.validated_data.get("quantity", 1)
+            cart_item.quantity += quantity
             cart_item.save()
 
         return cart_item
 
     def create(self, request, *args, **kwargs):
-        """
-        Override create to ensure SerializerMethodFields work correctly.
-        """
+        """Handle cart add requests with shop validation"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        cart_item = self.perform_create(serializer)
+        result = self.perform_create(serializer)
 
-        # Serialize the model instance, not validated_data
-        read_serializer = self.get_serializer(cart_item)
+        # If perform_create returned a warning dict
+        if isinstance(result, dict) and result.get("requires_reset"):
+            return Response(result, status=status.HTTP_409_CONFLICT)  # 409 = Conflict
+
+        # Otherwise normal response
+        read_serializer = self.get_serializer(result)
         headers = self.get_success_headers(read_serializer.data)
         return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @action(detail=False, methods=["post"])
     def checkout(self, request):
+        """Checkout the current cart"""
         customer = request.user
         cart_items = Cart.objects.filter(customer=customer)
 
         if not cart_items.exists():
             return Response({"detail": "Cart is empty."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # All items should belong to the same shop ideally
+        # Ensure all items belong to the same shop
         shop = cart_items.first().shop_item.shop
 
+        # Create the order
         order = Order.objects.create(customer=customer, shop=shop)
 
         for item in cart_items:
@@ -64,7 +91,7 @@ class CartViewSet(viewsets.ModelViewSet):
                 order=order,
                 shop_item=item.shop_item,
                 quantity=item.quantity,
-                price=item.shop_item.get_offer_price(),  # Correctly calculate offer price
+                price=item.shop_item.get_offer_price(),
             )
 
         order.calculate_totals()

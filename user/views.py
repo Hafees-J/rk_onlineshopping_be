@@ -1,5 +1,6 @@
-from rest_framework import generics, permissions
-from .serializers import CustomerRegisterSerializer
+from rest_framework import generics, permissions, viewsets
+from .models import Address
+from .serializers import AddressSerializer, CustomerRegisterSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -25,3 +26,22 @@ class CustomerRegisterView(generics.CreateAPIView):
             "user_id": user.id,
             "username": user.username
         }, status=status.HTTP_201_CREATED)
+
+
+class AddressViewSet(viewsets.ModelViewSet):
+    serializer_class = AddressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Address.objects.filter(user=self.request.user).order_by('-is_default', '-id')
+
+    def perform_create(self, serializer):
+        # If a new address is set as default, unset others
+        if serializer.validated_data.get("is_default", False):
+            Address.objects.filter(user=self.request.user, is_default=True).update(is_default=False)
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.validated_data.get("is_default", False):
+            Address.objects.filter(user=self.request.user, is_default=True).update(is_default=False)
+        serializer.save()
