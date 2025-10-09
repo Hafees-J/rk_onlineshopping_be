@@ -80,14 +80,15 @@ class ShopItem(models.Model):
         return Decimal('0')
 
     def calculate_taxable_and_gst(self):
-        """Calculate taxable price and GST amount from total price."""
+        """Calculate taxable price and GST amount from total_amount (inclusive of GST)."""
         gst_percent = self.gst_percent
         if gst_percent > 0:
-            taxable = (self.price * 100 / (100 + gst_percent)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            gst_amount = (self.price - taxable).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            taxable = (self.total_amount * 100 / (100 + gst_percent)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            gst_amount = (self.total_amount - taxable).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             return taxable, gst_amount
         else:
             return self.total_amount, Decimal('0.00')
+
 
  
     @property

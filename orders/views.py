@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import viewsets, permissions, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import api_view, permission_classes
@@ -5,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from .models import Order, Cart, OrderItem
-from .serializers import OrderSerializer, DistanceInputSerializer, CartSerializer
+from .serializers import OrderDetailSerializer, OrderSerializer, DistanceInputSerializer, CartSerializer
 from shop.models import Shop
 from .utils import get_distance_duration
 from rest_framework.decorators import action
@@ -84,7 +85,13 @@ class CartViewSet(viewsets.ModelViewSet):
         shop = cart_items.first().shop_item.shop
 
         # Create the order
-        order = Order.objects.create(customer=customer, shop=shop)
+        delivery_charge = Decimal(str(request.data.get("delivery_charge", 0)))
+        order = Order.objects.create(
+        customer=customer,
+        shop=shop,
+        delivery_address_id=request.data.get("delivery_address"),
+        delivery_charge=delivery_charge,
+    )
 
         for item in cart_items:
             OrderItem.objects.create(
@@ -120,19 +127,47 @@ class IsShopAdmin(permissions.BasePermission):
 
 
 class OrderViewSet(viewsets.ModelViewSet):
-    serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_serializer_class(self):
+        """Use different serializers for read/write"""
+        if self.action == "retrieve" or self.action == "order_details":
+            return OrderDetailSerializer
+        return OrderSerializer
+
     def get_queryset(self):
+        """Return orders based on user role"""
         user = self.request.user
 
         if getattr(user, "role", None) == "customer":
-            return Order.objects.filter(customer=user)
+            return Order.objects.filter(customer=user).order_by("-created_at")
 
         if getattr(user, "role", None) == "shopadmin":
-            return Order.objects.filter(shop__owner=user)
+            return Order.objects.filter(shop__owner=user).order_by("-created_at")
 
         return Order.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        """
+        🚫 Disable direct order creation here —
+        order placement happens via CartViewSet.checkout().
+        """
+        return Response(
+            {"detail": "Use /cart/checkout/ to place orders."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    @action(detail=True, methods=["get"], url_path="details")
+    def order_details(self, request, pk=None):
+        """Return full order bill including items and address"""
+        try:
+            order = self.get_queryset().get(pk=pk)
+        except Order.DoesNotExist:
+            return Response({"detail": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = OrderDetailSerializer(order)
+        return Response(serializer.data)
+
 
 
 # ---------------- Google Distance + Delivery Charge API ---------------- #

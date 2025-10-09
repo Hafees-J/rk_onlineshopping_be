@@ -1,4 +1,7 @@
+from decimal import Decimal
 from rest_framework import serializers
+
+from user.serializers import AddressSerializer
 from .models import Order, OrderItem
 from .models import Cart
 
@@ -41,11 +44,15 @@ class CartSerializer(serializers.ModelSerializer):
     
 class OrderItemSerializer(serializers.ModelSerializer):
     shop_item_name = serializers.CharField(source="shop_item.item.name", read_only=True)
+    subtotal = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
-        fields = ["id", "shop_item", "shop_item_name", "quantity", "price", "gst"]
-        read_only_fields = ["price", "gst"]
+        fields = ["id", "shop_item", "shop_item_name", "quantity", "price", "gst", "subtotal"]
+        read_only_fields = ["price", "gst", "subtotal"]
+
+    def get_subtotal(self, obj):
+        return (obj.price * obj.quantity).quantize(Decimal('0.01'))
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -89,14 +96,44 @@ class OrderSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        items_data = validated_data.pop("items")
+        items_data = validated_data.pop("items", [])
         order = Order.objects.create(**validated_data)
 
         for item_data in items_data:
             OrderItem.objects.create(order=order, **item_data)
 
-        order.save()
+        # Explicitly calculate totals now that all items exist
+        order.calculate_totals()
+        order.save(update_fields=["total_price", "gst", "delivery_charge"])
+
         return order
+
+
+class OrderDetailSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source="customer.username", read_only=True)
+    customer_email = serializers.CharField(source="customer.email", read_only=True)
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
+    items = OrderItemSerializer(many=True, read_only=True)
+    delivery_address_details = AddressSerializer(source="delivery_address", read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "customer_name",
+            "customer_email",
+            "shop_name",
+            "status",
+            "payment_status",
+            "created_at",
+            "updated_at",
+            "items",
+            "total_price",
+            "gst",
+            "delivery_charge",
+            "delivery_address_details",
+        ]
+
 
 
 class DistanceInputSerializer(serializers.Serializer):
