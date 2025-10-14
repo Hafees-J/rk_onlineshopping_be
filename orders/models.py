@@ -79,7 +79,7 @@ class Order(models.Model):
             self.delivery_charge = Decimal(str(cond.delivery_charge)) if hasattr(cond, "delivery_charge") else Decimal('0.00')
 
         self.gst = total_gst.quantize(Decimal('0.01'))
-        self.total_price = (total_price + total_gst + self.delivery_charge).quantize(Decimal('0.01'))
+        self.total_price = (total_price + self.delivery_charge).quantize(Decimal('0.01'))
 
 
 
