@@ -45,14 +45,24 @@ class CartSerializer(serializers.ModelSerializer):
 class OrderItemSerializer(serializers.ModelSerializer):
     shop_item_name = serializers.CharField(source="shop_item.item.name", read_only=True)
     subtotal = serializers.SerializerMethodField()
+    taxable_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = OrderItem
-        fields = ["id", "shop_item", "shop_item_name", "quantity", "price", "gst", "subtotal"]
-        read_only_fields = ["price", "gst", "subtotal"]
+        fields = [
+            "id",
+            "shop_item",
+            "shop_item_name",
+            "quantity",
+            "price",
+            "taxable_amount",
+            "gst",
+            "subtotal",
+        ]
+        read_only_fields = ["taxable_amount", "gst", "subtotal"]
 
     def get_subtotal(self, obj):
-        return (obj.price * obj.quantity).quantize(Decimal('0.01'))
+        return (obj.price * obj.quantity).quantize(Decimal("0.01"))
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -80,6 +90,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "items",
             "items_details",
             "total_price",
+            "taxable_total",
             "gst",
             "delivery_charge",
             "delivery_address",
@@ -91,6 +102,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "updated_at",
             "items_details",
             "total_price",
+            "taxable_total",
             "gst",
             "delivery_charge",
         ]
@@ -102,10 +114,8 @@ class OrderSerializer(serializers.ModelSerializer):
         for item_data in items_data:
             OrderItem.objects.create(order=order, **item_data)
 
-        # Explicitly calculate totals now that all items exist
         order.calculate_totals()
-        order.save(update_fields=["total_price", "gst", "delivery_charge"])
-
+        order.save(update_fields=["total_price", "gst", "taxable_total", "delivery_charge"])
         return order
 
 
@@ -128,13 +138,12 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "items",
-            "total_price",
+            "taxable_total",
             "gst",
             "delivery_charge",
+            "total_price",
             "delivery_address_details",
         ]
-
-
 
 class DistanceInputSerializer(serializers.Serializer):
     user_lat = serializers.FloatField()

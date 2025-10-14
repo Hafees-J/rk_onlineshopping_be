@@ -130,13 +130,11 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
-        """Use different serializers for read/write"""
-        if self.action == "retrieve" or self.action == "order_details":
+        if self.action in ["retrieve", "order_details"]:
             return OrderDetailSerializer
         return OrderSerializer
 
     def get_queryset(self):
-        """Return orders based on user role"""
         user = self.request.user
 
         if getattr(user, "role", None) == "customer":
@@ -148,18 +146,13 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Order.objects.none()
 
     def create(self, request, *args, **kwargs):
-        """
-        🚫 Disable direct order creation here —
-        order placement happens via CartViewSet.checkout().
-        """
         return Response(
             {"detail": "Use /cart/checkout/ to place orders."},
-            status=status.HTTP_405_METHOD_NOT_ALLOWED
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
     @action(detail=True, methods=["get"], url_path="details")
     def order_details(self, request, pk=None):
-        """Return full order bill including items and address"""
         try:
             order = self.get_queryset().get(pk=pk)
         except Order.DoesNotExist:
@@ -167,7 +160,6 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         serializer = OrderDetailSerializer(order)
         return Response(serializer.data)
-
 
 
 # ---------------- Google Distance + Delivery Charge API ---------------- #
