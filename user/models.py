@@ -9,13 +9,13 @@ class User(AbstractUser):
         ('deliveryboy', 'Delivery Boy'),
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
+    mobile_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
 
     def __str__(self):
         return f"{self.username} ({self.role})"
     
 class CustomerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    mobile = models.CharField(max_length=15, blank=True)
     is_admin = models.BooleanField(default=False)
 
     def __str__(self):

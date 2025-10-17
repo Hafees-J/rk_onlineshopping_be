@@ -1,6 +1,5 @@
 from decimal import Decimal
 from rest_framework import serializers
-
 from user.serializers import AddressSerializer
 from .models import Order, OrderItem
 from .models import Cart
@@ -9,7 +8,6 @@ class CartSerializer(serializers.ModelSerializer):
     shop_item_name = serializers.CharField(source="shop_item.item.name", read_only=True)
     price = serializers.SerializerMethodField()
     
-    # New fields
     shop_id = serializers.IntegerField(source="shop_item.shop.id", read_only=True)
     shop_name = serializers.CharField(source="shop_item.shop.name", read_only=True)
     shop_lat = serializers.SerializerMethodField()
@@ -72,6 +70,7 @@ class OrderSerializer(serializers.ModelSerializer):
     customer = serializers.HiddenField(default=serializers.CurrentUserDefault())
     customer_name = serializers.CharField(source="customer.username", read_only=True)
     customer_email = serializers.CharField(source="customer.email", read_only=True)
+    customer_mobile = serializers.CharField(source="customer.mobile_number", read_only=True)
     shop_name = serializers.CharField(source="shop.name", read_only=True)
 
     class Meta:
@@ -81,6 +80,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "customer",
             "customer_name",
             "customer_email",
+            "customer_mobile",
             "shop",
             "shop_name",
             "status",
@@ -122,6 +122,7 @@ class OrderSerializer(serializers.ModelSerializer):
 class OrderDetailSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source="customer.username", read_only=True)
     customer_email = serializers.CharField(source="customer.email", read_only=True)
+    customer_mobile = serializers.CharField(source="customer.mobile_number", read_only=True)
     shop_name = serializers.CharField(source="shop.name", read_only=True)
     items = OrderItemSerializer(many=True, read_only=True)
     delivery_address_details = AddressSerializer(source="delivery_address", read_only=True)
@@ -132,6 +133,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             "id",
             "customer_name",
             "customer_email",
+            "customer_mobile",
             "shop_name",
             "status",
             "payment_status",
