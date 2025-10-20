@@ -152,16 +152,23 @@ class AvailableSubCategoriesView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        print("User:", self.request.user)
-        print("Authenticated:", self.request.user.is_authenticated)
-        print("Role:", getattr(self.request.user, "role", None))
         return super().get_queryset()
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
 
 class CustomerShopItemsView(generics.ListAPIView):
     serializer_class = CustomerShopItemSerializer
-    permission_classes = [permissions.AllowAny]  # or IsAuthenticated if needed
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         shop_id = self.kwargs['shop_id']
         return ShopItem.objects.filter(shop_id=shop_id, is_available=True)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context

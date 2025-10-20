@@ -7,7 +7,8 @@ from .models import Cart
 class CartSerializer(serializers.ModelSerializer):
     shop_item_name = serializers.CharField(source="shop_item.item.name", read_only=True)
     price = serializers.SerializerMethodField()
-    
+    display_image = serializers.SerializerMethodField()  # ✅ added
+
     shop_id = serializers.IntegerField(source="shop_item.shop.id", read_only=True)
     shop_name = serializers.CharField(source="shop_item.shop.name", read_only=True)
     shop_lat = serializers.SerializerMethodField()
@@ -25,6 +26,7 @@ class CartSerializer(serializers.ModelSerializer):
             "shop_name",
             "shop_lat",
             "shop_lng",
+            "display_image",  # ✅ added
         ]
 
     def get_price(self, obj):
@@ -37,6 +39,15 @@ class CartSerializer(serializers.ModelSerializer):
     def get_shop_lng(self, obj):
         lng = getattr(obj.shop_item.shop, "longitude", None)
         return float(lng) if lng else None
+
+    def get_display_image(self, obj):
+        """Return shop item image or fallback to base item image."""
+        shop_item = obj.shop_item
+        if shop_item.image:
+            return shop_item.image.url if hasattr(shop_item.image, "url") else shop_item.image
+        elif shop_item.item.image:
+            return shop_item.item.image.url if hasattr(shop_item.item.image, "url") else shop_item.item.image
+        return None
 
 
     

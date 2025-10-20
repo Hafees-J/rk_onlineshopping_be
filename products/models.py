@@ -2,6 +2,7 @@ from django.db import models
 from shop.models import Shop
 from decimal import Decimal, ROUND_HALF_UP
 
+
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -18,11 +19,11 @@ class SubCategory(models.Model):
     image = models.ImageField(upload_to='subcategory_images/', blank=True, null=True)
 
     class Meta:
-        unique_together = ('category', 'name')  # prevent duplicates within category
+        unique_together = ('category', 'name')
 
     def __str__(self):
         return f"{self.name} ({self.category.name})"
-    
+
 
 class HSN(models.Model):
     hsncode = models.CharField(max_length=20, unique=True)
@@ -40,31 +41,54 @@ class Item(models.Model):
     hsn = models.ForeignKey(HSN, on_delete=models.SET_NULL, null=True, blank=True, related_name="items")
 
     class Meta:
-        unique_together = ('subcategory', 'name')  # prevent duplicates
+        unique_together = ('subcategory', 'name')
 
     def __str__(self):
         return f"{self.name} - {self.subcategory.name}"
 
 
-
+# ✅ Added image + fallback
 class ShopCategory(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='shopcategory_images/', blank=True, null=True)
 
+    @property
+    def display_image(self):
+        if self.image:
+            return self.image.url
+        return self.category.image.url if self.category.image else None
+
+    def __str__(self):
+        return f"{self.category.name} ({self.shop.name})"
+
+
+# ✅ Added image + fallback
 class ShopSubCategory(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
     subcategory = models.ForeignKey(SubCategory, on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='shopsubcategory_images/', blank=True, null=True)
+
+    @property
+    def display_image(self):
+        if self.image:
+            return self.image.url
+        return self.subcategory.image.url if self.subcategory.image else None
+
+    def __str__(self):
+        return f"{self.subcategory.name} ({self.shop.name})"
 
 
-
+# ✅ Added image + fallback
 class ShopItem(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="shopitems")
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="shopitems")
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2) 
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     available_quantity = models.PositiveIntegerField(default=0)
     available_from = models.TimeField(null=True, blank=True)
     available_till = models.TimeField(null=True, blank=True)
     is_available = models.BooleanField(default=True)
+    image = models.ImageField(upload_to='shopitem_images/', blank=True, null=True)
 
     class Meta:
         unique_together = ('shop', 'item')
@@ -73,14 +97,18 @@ class ShopItem(models.Model):
         return f"{self.item.name} @ {self.shop.name}"
 
     @property
+    def display_image(self):
+        if self.image:
+            return self.image.url
+        return self.item.image.url if self.item.image else None
+
+    @property
     def gst_percent(self):
-        """Get GST % from item's HSN."""
         if self.item.hsn and self.item.hsn.gst:
             return Decimal(self.item.hsn.gst)
         return Decimal('0')
 
     def calculate_taxable_and_gst(self):
-        """Calculate taxable price and GST amount from total_amount (inclusive of GST)."""
         gst_percent = self.gst_percent
         if gst_percent > 0:
             taxable = (self.total_amount * 100 / (100 + gst_percent)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -89,36 +117,27 @@ class ShopItem(models.Model):
         else:
             return self.total_amount, Decimal('0.00')
 
-
- 
     @property
     def active_offer(self):
-        """Return active offer for UI highlights. Fast filter using active flag."""
         return self.offers.filter(active=True).first()
 
     def get_offer_price(self):
-        """
-        Calculate simple offer price for UI highlight.
-        Ignores quantity limits and GST.
-        """
         offer = self.active_offer
         if offer:
-            # Discounted price per unit
             discounted_price = (self.total_amount * (offer.offer_pct) / 100).quantize(
                 Decimal('0.01'), rounding=ROUND_HALF_UP
             )
-            return self.total_amount-discounted_price
-        else:
-            return self.total_amount
+            return self.total_amount - discounted_price
+        return self.total_amount
 
 
 class ShopItemOffer(models.Model):
     shop_item = models.ForeignKey(ShopItem, on_delete=models.CASCADE, related_name="offers")
     offer_starting_datetime = models.DateTimeField()
     offer_ending_datetime = models.DateTimeField()
-    offer_pct = models.DecimalField(max_digits=5, decimal_places=2)  # 10 = 10%
-    max_quantity = models.PositiveIntegerField(default=1)  # 0 = unlimited
-    active = models.BooleanField(default=False)  # for fast filtering
+    offer_pct = models.DecimalField(max_digits=5, decimal_places=2)
+    max_quantity = models.PositiveIntegerField(default=1)
+    active = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Offer {self.offer_pct}% for {self.shop_item.item.name} in {self.shop_item.shop.name}"
