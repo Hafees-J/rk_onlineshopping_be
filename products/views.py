@@ -5,11 +5,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from shop.models import Shop
 from shop.serializers import ShopSerializer
-from .models import Category, ShopCategory, ShopSubCategory, SubCategory, Item, ShopItem, ShopItemOffer
+from .models import HSN, Category, ShopCategory, ShopSubCategory, SubCategory, Item, ShopItem, ShopItemOffer
 from .serializers import (
     AvailableSubCategorySerializer,
     CategorySerializer,
     CustomerShopItemSerializer,
+    HSNSerializer,
     SubCategorySerializer,
     ItemSerializer,
     ShopItemSerializer,
@@ -38,6 +39,10 @@ class SubCategoryViewSet(viewsets.ModelViewSet):
     serializer_class = SubCategorySerializer
     permission_classes = [permissions.IsAuthenticated, IsShopAdmin]
 
+class HSNViewSet(viewsets.ModelViewSet):
+    queryset = HSN.objects.all().order_by('hsncode')
+    serializer_class = HSNSerializer
+    permission_classes = [permissions.IsAuthenticated, IsShopAdmin]
 
 class ItemViewSet(viewsets.ModelViewSet):
     queryset = Item.objects.all()

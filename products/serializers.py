@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 from .models import (
-    Category, SubCategory, Item,
+    HSN, Category, SubCategory, Item,
     ShopSubCategory, ShopItem, ShopItemOffer
 )
 
@@ -24,17 +24,33 @@ class SubCategorySerializer(serializers.ModelSerializer):
         model = SubCategory
         fields = ['id', 'category', 'category_name', 'name', 'description', 'image']
 
+class HSNSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HSN
+        fields = ['id', 'hsncode', 'gst']
+
 
 class ItemSerializer(serializers.ModelSerializer):
     subcategory_name = serializers.CharField(source="subcategory.name", read_only=True)
     category_name = serializers.CharField(source="subcategory.category.name", read_only=True)
     image = serializers.ImageField(use_url=True, required=False)
+    hsn = HSNSerializer(read_only=True)
+    hsn_id = serializers.PrimaryKeyRelatedField(
+        queryset=HSN.objects.all(), source="hsn", write_only=True, required=False
+    )
 
     class Meta:
         model = Item
         fields = [
-            'id', 'subcategory', 'subcategory_name', 'category_name',
-            'name', 'description', 'image'
+            "id",
+            "subcategory",
+            "subcategory_name",
+            "category_name",
+            "name",
+            "description",
+            "hsn",
+            "hsn_id",
+            "image",
         ]
 
 

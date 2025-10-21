@@ -83,7 +83,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "mobile_number",
             "role",
         ]
-        read_only_fields = ["id", "role", "username"]
+        read_only_fields = ["id", "role"]
 
     def validate_email(self, value):
         user = self.context["request"].user
