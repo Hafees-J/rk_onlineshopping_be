@@ -107,8 +107,6 @@ class OrderSerializer(serializers.ModelSerializer):
             "delivery_address",
         ]
         read_only_fields = [
-            "status",
-            "payment_status",
             "created_at",
             "updated_at",
             "items_details",

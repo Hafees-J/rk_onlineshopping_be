@@ -141,7 +141,7 @@ class ShopItemOfferViewSet(viewsets.ModelViewSet):
 
 
 class ShopsBySubCategoryView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
     serializer_class = ShopSerializer  # use your existing Shop serializer
 
     def get_queryset(self):

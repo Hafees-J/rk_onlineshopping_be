@@ -126,7 +126,15 @@ class IsShopAdmin(permissions.BasePermission):
         )
 
 
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import Order
+from .serializers import OrderSerializer, OrderDetailSerializer
+
+
 class OrderViewSet(viewsets.ModelViewSet):
+    """Handles order listing, retrieval, and management for customers, shop admins, and superusers."""
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
@@ -143,23 +151,106 @@ class OrderViewSet(viewsets.ModelViewSet):
         if getattr(user, "role", None) == "shopadmin":
             return Order.objects.filter(shop__owner=user).order_by("-created_at")
 
+        if user.is_superuser:
+            return Order.objects.all().order_by("-created_at")
+
         return Order.objects.none()
 
     def create(self, request, *args, **kwargs):
+        """Prevent direct creation of orders via this endpoint."""
         return Response(
             {"detail": "Use /cart/checkout/ to place orders."},
             status=status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
+    # ✅ Get full order details
     @action(detail=True, methods=["get"], url_path="details")
     def order_details(self, request, pk=None):
+        """Retrieve detailed information about a specific order."""
         try:
             order = self.get_queryset().get(pk=pk)
         except Order.DoesNotExist:
-            return Response({"detail": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = OrderDetailSerializer(order)
         return Response(serializer.data)
+
+    # ✅ Update order status
+    @action(detail=True, methods=["patch"], url_path="update-status")
+    def update_status(self, request, pk=None):
+        """Allows shop admin or superuser to update the order status."""
+        user = request.user
+
+        if not (getattr(user, "role", None) == "shopadmin" or user.is_superuser):
+            return Response(
+                {"detail": "Only shop admins or superusers can update order status."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            order = self.get_queryset().get(pk=pk)
+        except Order.DoesNotExist:
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        new_status = request.data.get("status")
+        valid_statuses = dict(Order.STATUS_CHOICES)
+
+        if new_status not in valid_statuses:
+            return Response(
+                {"detail": f"Invalid status. Valid options: {list(valid_statuses.keys())}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order.status = new_status
+        order.save(update_fields=["status", "updated_at"])
+
+        return Response(
+            {"message": f"Order status updated to '{new_status}' successfully."},
+            status=status.HTTP_200_OK,
+        )
+
+    # ✅ Update payment status
+    @action(detail=True, methods=["patch"], url_path="update-payment-status")
+    def update_payment_status(self, request, pk=None):
+        """Allows shop admin or superuser to update the payment status."""
+        user = request.user
+
+        if not (getattr(user, "role", None) == "shopadmin" or user.is_superuser):
+            return Response(
+                {"detail": "Only shop admins or superusers can update payment status."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            order = self.get_queryset().get(pk=pk)
+        except Order.DoesNotExist:
+            return Response({"detail": "Order not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        new_payment_status = request.data.get("payment_status")
+        valid_payment_statuses = dict(Order.PAYMENT_STATUS_CHOICES)
+
+        if new_payment_status not in valid_payment_statuses:
+            return Response(
+                {"detail": f"Invalid payment status. Valid options: {list(valid_payment_statuses.keys())}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order.payment_status = new_payment_status
+        order.save(update_fields=["payment_status", "updated_at"])
+
+        return Response(
+            {"message": f"Payment status updated to '{new_payment_status}' successfully."},
+            status=status.HTTP_200_OK,
+        )
+
+    # ✅ Expose status choices to frontend
+    @action(detail=False, methods=["get"], url_path="status-choices")
+    def status_choices(self, request):
+        """Return available order and payment statuses."""
+        return Response({
+            "order_status_choices": dict(Order.STATUS_CHOICES),
+            "payment_status_choices": dict(Order.PAYMENT_STATUS_CHOICES),
+        })
 
 
 # ---------------- Google Distance + Delivery Charge API ---------------- #

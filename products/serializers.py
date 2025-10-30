@@ -92,9 +92,11 @@ class ShopItemSerializer(serializers.ModelSerializer):
         return obj.get_offer_price()
 
     def get_display_image(self, obj):
-        """Return shop item image or fallback to base item image."""
-        if obj.display_image:
-            return obj.display_image
+        request = self.context.get("request")
+        # Priority: ShopItem image -> Base Item image
+        image_field = obj.image or obj.item.image
+        if image_field:
+            return request.build_absolute_uri(image_field.url)
         return None
 
 
