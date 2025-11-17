@@ -9,8 +9,6 @@ venv/
 ENV/
 *.env
 
-# Database
-*.sqlite3
 
 # Django migrations (optional to ignore)
 **/migrations/*.py
